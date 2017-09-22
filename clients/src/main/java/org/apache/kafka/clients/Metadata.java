@@ -16,12 +16,13 @@
  */
 package org.apache.kafka.clients;
 
+import org.apache.kafka.common.ClientTimeoutException;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.errors.AuthenticationException;
-import org.apache.kafka.common.errors.TimeoutException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -177,7 +178,7 @@ public final class Metadata {
                 wait(remainingWaitMs);
             long elapsed = System.currentTimeMillis() - begin;
             if (elapsed >= maxWaitMs)
-                throw new TimeoutException("Failed to update metadata after " + maxWaitMs + " ms.");
+                throw new ClientTimeoutException("Failed to update metadata after " + maxWaitMs + " ms.");
             remainingWaitMs = maxWaitMs - elapsed;
         }
     }

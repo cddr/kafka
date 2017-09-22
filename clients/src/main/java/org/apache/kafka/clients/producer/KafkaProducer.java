@@ -29,6 +29,7 @@ import org.apache.kafka.clients.producer.internals.RecordAccumulator;
 import org.apache.kafka.clients.producer.internals.Sender;
 import org.apache.kafka.clients.producer.internals.TransactionManager;
 import org.apache.kafka.clients.producer.internals.TransactionalRequestResult;
+import org.apache.kafka.common.ClientTimeoutException;
 import org.apache.kafka.common.Cluster;
 import org.apache.kafka.common.KafkaException;
 import org.apache.kafka.common.Metric;
@@ -41,7 +42,6 @@ import org.apache.kafka.common.errors.InterruptException;
 import org.apache.kafka.common.errors.ProducerFencedException;
 import org.apache.kafka.common.errors.RecordTooLargeException;
 import org.apache.kafka.common.errors.SerializationException;
-import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.Headers;
@@ -819,12 +819,15 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             // for other exceptions throw directly
         } catch (ApiException e) {
             log.debug("Exception occurred during message send:", e);
-            if (callback != null)
-                callback.onCompletion(null, e);
             this.errors.record();
             if (this.interceptors != null)
                 this.interceptors.onSendError(record, tp, e);
             return new FutureFailure(e);
+        } catch (ClientTimeoutException e) {
+            this.errors.record();
+            if (this.interceptors != null)
+                this.interceptors.onSendError(record, tp, e);
+            throw new ClientTimeoutException(e);
         } catch (InterruptedException e) {
             this.errors.record();
             if (this.interceptors != null)
@@ -886,14 +889,14 @@ public class KafkaProducer<K, V> implements Producer<K, V> {
             sender.wakeup();
             try {
                 metadata.awaitUpdate(version, remainingWaitMs);
-            } catch (TimeoutException ex) {
+            } catch (ClientTimeoutException ex) {
                 // Rethrow with original maxWaitMs to prevent logging exception with remainingWaitMs
-                throw new TimeoutException("Failed to update metadata after " + maxWaitMs + " ms.");
+                throw new ClientTimeoutException("Failed to update metadata after " + maxWaitMs + " ms.");
             }
             cluster = metadata.fetch();
             elapsed = time.milliseconds() - begin;
             if (elapsed >= maxWaitMs)
-                throw new TimeoutException("Failed to update metadata after " + maxWaitMs + " ms.");
+                throw new ClientTimeoutException("Failed to update metadata after " + maxWaitMs + " ms.");
             if (cluster.unauthorizedTopics().contains(topic))
                 throw new TopicAuthorizationException(topic);
             remainingWaitMs = maxWaitMs - elapsed;

@@ -25,10 +25,10 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.kafka.common.Cluster;
+import org.apache.kafka.common.ClientTimeoutException;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
-import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.test.MockClusterResourceListener;
 import org.apache.kafka.test.TestUtils;
 import org.junit.After;
@@ -197,7 +197,7 @@ public class MetadataTest {
         try {
             metadata.awaitUpdate(metadata.requestUpdate(), 0);
             fail("Wait on metadata update was expected to timeout, but it didn't");
-        } catch (TimeoutException te) {
+        } catch (ClientTimeoutException cte) {
             // expected
         }
         // now try with a higher timeout value once
@@ -205,7 +205,7 @@ public class MetadataTest {
         try {
             metadata.awaitUpdate(metadata.requestUpdate(), twoSecondWait);
             fail("Wait on metadata update was expected to timeout, but it didn't");
-        } catch (TimeoutException te) {
+        } catch (ClientTimeoutException cte) {
             // expected
         }
     }

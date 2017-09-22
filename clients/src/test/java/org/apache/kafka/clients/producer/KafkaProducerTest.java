@@ -25,7 +25,7 @@ import org.apache.kafka.common.Node;
 import org.apache.kafka.common.PartitionInfo;
 import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.config.ConfigException;
-import org.apache.kafka.common.errors.TimeoutException;
+import org.apache.kafka.common.ClientTimeoutException;
 import org.apache.kafka.common.internals.ClusterResourceListeners;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.apache.kafka.common.metrics.Sensor;
@@ -188,6 +188,31 @@ public class KafkaProducerTest {
         new KafkaProducer<>(config, new ByteArraySerializer(), new ByteArraySerializer());
     }
 
+
+    @PrepareOnlyThisForTest(Metadata.class)
+    @Test
+    public void testMetadataFetchWithClientTimeout() throws Exception {
+        Properties props = new Properties();
+        props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9999");
+        KafkaProducer<String, String> producer = new KafkaProducer<>(props, new StringSerializer(), new StringSerializer());
+        Metadata metadata = PowerMock.createNiceMock(Metadata.class);
+        MemberModifier.field(KafkaProducer.class, "metadata").set(producer, metadata);
+
+        String topic = "topic";
+        ProducerRecord<String, String> record = new ProducerRecord<>(topic, "value");
+
+        EasyMock.expect(metadata.fetch()).andThrow(new ClientTimeoutException("Client timeout while fetching metadata")).anyTimes();
+        PowerMock.replay(metadata);
+
+        try {
+            producer.send(record);
+        } catch(Exception e) {
+            Assert.assertTrue("Timeout throws ClientTimeoutException", e instanceof ClientTimeoutException);
+        }
+
+        PowerMock.verify(metadata);
+    }
+
     @PrepareOnlyThisForTest(Metadata.class)
     @Test
     public void testMetadataFetch() throws Exception {
@@ -345,7 +370,7 @@ public class KafkaProducerTest {
         try {
             producer.partitionsFor(topic);
             fail("Expect TimeoutException");
-        } catch (TimeoutException e) {
+        } catch (ClientTimeoutException e) {
             // skip
         }
         Assert.assertTrue("Topic should still exist in metadata", metadata.containsTopic(topic));
