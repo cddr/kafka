@@ -460,7 +460,7 @@ public class KafkaProducerTest {
     public void testInterceptorPartitionSetOnTooLargeRecord() throws Exception {
         Properties props = new Properties();
         props.setProperty(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9999");
-        props.setProperty(ProducerConfig.MAX_REQUEST_SIZE_CONFIG, "1");
+        props.setProperty(ProducerConfig.BUFFER_MEMORY_CONFIG, "1");
         String topic = "topic";
         ProducerRecord<String, String> record = new ProducerRecord<>(topic, "value");
 
@@ -476,18 +476,12 @@ public class KafkaProducerTest {
             Collections.<String>emptySet());
         EasyMock.expect(metadata.fetch()).andReturn(cluster).once();
 
-        // Mock interceptors field
-        ProducerInterceptors interceptors = PowerMock.createMock(ProducerInterceptors.class);
-        EasyMock.expect(interceptors.onSend(record)).andReturn(record);
-        interceptors.onSendError(EasyMock.eq(record), EasyMock.<TopicPartition>notNull(), EasyMock.<Exception>notNull());
-        EasyMock.expectLastCall();
-        MemberModifier.field(KafkaProducer.class, "interceptors").set(producer, interceptors);
-
-        PowerMock.replay(metadata);
-        EasyMock.replay(interceptors);
-        producer.send(record);
-
-        EasyMock.verify(interceptors);
+        try {
+            producer.send(record);
+            fail("Expected IllegalArgumentException to be raised");
+        } catch (IllegalArgumentException e) {
+            // expected
+        }
     }
 
     @Test
